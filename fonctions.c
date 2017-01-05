@@ -57,44 +57,64 @@ void connecter(void * arg) {
 
 void communiquer(void *arg) {
     DMessage *msg = d_new_message();
-    int var1 = 1;
+    int receive_ok = 1;
     int num_msg = 0;
+    int compteur = 0;
 
     rt_printf("tserver : Début de l'exécution de serveur\n");
-    serveur->open(serveur, "8000");
-    rt_printf("tserver : Connexion\n");
 
-    rt_mutex_acquire(&mutexEtat, TM_INFINITE);
-    etatCommMoniteur = 0;
-    rt_mutex_release(&mutexEtat);
+     while (1) {
+        
+        //rt_printf("tconnect : Attente du sémarphore semServeurOpen\n");
+        //rt_sem_p(&semServeurOpen, TM_INFINITE);
+        //rt_printf("tconnect : Ouverture de la communication avec le robot\n");
+        
+        serveur->open(serveur, "8000");
+        rt_printf("tserver : Connexion\n");
 
-    while (var1 > 0) {
-        rt_printf("tserver : Attente d'un message\n");
-        var1 = serveur->receive(serveur, msg);
-        num_msg++;
-        if (var1 > 0) {
-            switch (msg->get_type(msg)) {
-                case MESSAGE_TYPE_ACTION:
-                    rt_printf("tserver : Le message %d reçu est une action\n",
-                            num_msg);
-                    DAction *action = d_new_action();
-                    action->from_message(action, msg);
-                    switch (action->get_order(action)) {
-                        case ACTION_CONNECT_ROBOT:
-                            rt_printf("tserver : Action connecter robot\n");
-                            rt_sem_v(&semConnecterRobot);
-                            break;
-                    }
-                    break;
-                case MESSAGE_TYPE_MOVEMENT:
-                    rt_printf("tserver : Le message reçu %d est un mouvement\n",
-                            num_msg);
-                    rt_mutex_acquire(&mutexMove, TM_INFINITE);
-                    move->from_message(move, msg);
-                    move->print(move);
-                    rt_mutex_release(&mutexMove);
-                    break;
-            }
+        rt_mutex_acquire(&mutexEtat, TM_INFINITE);
+        etatCommMoniteur = STATUS_OK;
+        rt_mutex_release(&mutexEtat);
+
+        //REDONNER LES SEMAPHORES (batterie watchdog)
+
+
+        while (receive_ok > 0) {
+            rt_printf("tserver : Attente d'un message\n");
+            receive_ok = serveur->receive(serveur, msg); //receive renvoie le nombre d'octets (0 ou inf si erreur)
+            num_msg++;
+                switch (msg->get_type(msg)) {
+                    case MESSAGE_TYPE_ACTION:
+                        rt_printf("tserver : Le message %d reçu est une action\n",
+                                num_msg);
+                        DAction *action = d_new_action();
+                        action->from_message(action, msg);
+                        switch (action->get_order(action)) {
+                            case ACTION_CONNECT_ROBOT:
+                                rt_printf("tserver : Action connecter robot\n");
+                                rt_sem_v(&semConnecterRobot);
+                                break;
+                        }
+                        break;
+                    case MESSAGE_TYPE_MOVEMENT:
+                        rt_printf("tserver : Le message reçu %d est un mouvement\n",
+                                num_msg);
+                        rt_mutex_acquire(&mutexMove, TM_INFINITE);
+                        move->from_message(move, msg);
+                        //RECHARGER WATCHDOG
+                        move->print(move);
+                        rt_mutex_release(&mutexMove);
+                        break;
+                }
+        rt_mutex_acquire(&mutexEtat, TM_INFINITE);
+        etatCommMoniteur = STATUS_ERR_SELECT; 
+        rt_mutex_release(&mutexEtat);
+
+        // PRENDRE TOUS LES SEMAPHORES DE COMMUNICATION (batterie et watchdog)
+
+        serveur->close(serveur) ;
+        
+
         }
     }
 }
