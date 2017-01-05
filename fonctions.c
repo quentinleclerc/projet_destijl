@@ -101,7 +101,6 @@ void communiquer(void *arg) {
                                 num_msg);
                         rt_mutex_acquire(&mutexMove, TM_INFINITE);
                         move->from_message(move, msg);
-                        //RECHARGER WATCHDOG
                         move->print(move);
                         rt_mutex_release(&mutexMove);
                         break;
@@ -166,17 +165,30 @@ void deplacer(void *arg) {
             status = robot->set_motors(robot, gauche, droite);
 
             if (status != STATUS_OK) {
-                rt_mutex_acquire(&mutexEtat, TM_INFINITE);
-                etatCommRobot = status;
-                rt_mutex_release(&mutexEtat);
-
-                message = d_new_message();
-                message->put_state(message, status);
-
-                rt_printf("tmove : Envoi message\n");
-                if (write_in_queue(&queueMsgGUI, message, sizeof (DMessage)) < 0) {
-                    message->free(message);
+                if(nbErreurs < 3){
+                    rt_mutex_acquire(&mutexNbErreurs, TM_INFINITE);
+                    nbErreurs++;
+                    rt_mutex_release(&mutexEtat);
                 }
+
+                else{
+                    rt_mutex_acquire(&mutexEtat, TM_INFINITE);
+                    etatCommRobot = status;
+                    rt_mutex_release(&mutexEtat);
+
+                    message = d_new_message();
+                    message->put_state(message, status);
+
+                    rt_printf("tmove : Envoi message\n");
+                    if (write_in_queue(&queueMsgGUI, message, sizeof (DMessage)) < 0) {
+                        message->free(message);
+                    }
+                }
+            }
+            else{
+                rt_mutex_acquire(&mutexNbErreurs, TM_INFINITE);
+                nbErreurs++;
+                rt_mutex_release(&mutexEtat);
             }
         }
     }
@@ -220,7 +232,6 @@ void verifierbatterie(void *arg) {
         rt_sem_v(&semVerifierBatterie);
     }
 }
-
 
 int write_in_queue(RT_QUEUE *msgQueue, void * data, int size) {
     void *msg;
