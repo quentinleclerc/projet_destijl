@@ -38,6 +38,8 @@ void connecter(void * arg) {
             status = robot->start_insecurely(robot);
             if (status == STATUS_OK){
                 rt_printf("tconnect : Robot démarrer\n");
+                rt_printf("tconnect : Release sem verifier\n");
+                rt_sem_v(&semVerifierBatterie);    
             }
         }
 
@@ -159,6 +161,46 @@ void deplacer(void *arg) {
         }
     }
 }
+
+// Batterie, periode 250ms, Low-priority
+void verifierbatterie(void *arg) {
+    int status = 0;
+    int vbat;
+    DMessage *message;
+
+    rt_printf("tbatterie : Debut de l'éxecution de periodique à 250ms\n");
+    rt_task_set_periodic(NULL, TM_NOW, 250000000);
+       
+    
+    while(1){
+        /* Attente de l'activation périodique */
+        rt_task_wait_period(NULL);
+        rt_printf("tbatterie : Activation périodique\n");
+
+        // attente semaphore
+        rt_printf("tbatterie : Attente du sémarphore semVerifierBatterie\n");
+        rt_sem_p(&semVerifierBatterie, TM_INFINITE);
+        rt_printf("tbatterie : Get semaphore batterie\n");
+        
+        status = robot->get_vbat(robot,&vbat);
+        
+        // status presque toujours 0, mais vbat risque -1
+        if ((status == STATUS_OK)&&(vbat != BATTERY_LEVEL_UNKNOWN)) {
+            batterie->set_level(batterie,vbat);
+            
+            message = d_new_message();
+            message->put_battery_level(message, batterie);
+                
+            rt_printf("tbatterie : Envoi message\n");
+            if (write_in_queue(&queueMsgGUI, message, sizeof (DMessage)) < 0) {
+                message->free(message);
+            }
+        }
+        
+        rt_sem_v(&semVerifierBatterie);
+    }
+}
+
 
 int write_in_queue(RT_QUEUE *msgQueue, void * data, int size) {
     void *msg;

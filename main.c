@@ -67,6 +67,10 @@ void initStruct(void) {
         rt_printf("Error semaphore create: %s\n", strerror(-err));
         exit(EXIT_FAILURE);
     }
+    if (err = rt_sem_create(&semVerifierBatterie, NULL, 0, S_FIFO)) {
+        rt_printf("Error semaphore create: %s\n", strerror(-err));
+        exit(EXIT_FAILURE);
+    }
 
     /* Creation des taches */
     if (err = rt_task_create(&tServeur, NULL, 0, PRIORITY_TSERVEUR, 0)) {
@@ -85,6 +89,10 @@ void initStruct(void) {
         rt_printf("Error task create: %s\n", strerror(-err));
         exit(EXIT_FAILURE);
     }
+    if (err = rt_task_create(&tverifierbatterie, NULL, 0, PRIORITY_TVERIFIERBATTERIE, 0)) {
+        rt_printf("Error task create: %s\n", strerror(-err));
+        exit(EXIT_FAILURE);
+    }
 
     /* Creation des files de messages */
     if (err = rt_queue_create(&queueMsgGUI, "toto", MSG_QUEUE_SIZE*sizeof(DMessage), MSG_QUEUE_SIZE, Q_FIFO)){
@@ -96,6 +104,7 @@ void initStruct(void) {
     robot = d_new_robot();
     move = d_new_movement();
     serveur = d_new_server();
+    batterie = d_new_battery();
 }
 
 void startTasks() {
@@ -116,7 +125,10 @@ void startTasks() {
         rt_printf("Error task start: %s\n", strerror(-err));
         exit(EXIT_FAILURE);
     }
-
+    if (err = rt_task_start(&tverifierbatterie, &verifierbatterie, NULL)) {
+        rt_printf("Error task start: %s\n", strerror(-err));
+        exit(EXIT_FAILURE);
+    }
 }
 
 void deleteTasks() {
