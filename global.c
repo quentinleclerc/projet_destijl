@@ -15,16 +15,17 @@ RT_TASK tverifierbatterie;
 
 RT_MUTEX mutexEtat;
 RT_MUTEX mutexMove;
-RT_MUTEX mutexNbErreurs;
+RT_MUTEX mutexCompteur;
 
 RT_SEM semConnecterRobot;
 RT_SEM semVerifierBatterie;
+RT_SEM semCompteur;
 
 RT_QUEUE queueMsgGUI;
 
 int etatCommMoniteur = 1;
 int etatCommRobot = 1;
-int nbErreurs = 0;
+int compteur = 0;
 DRobot *robot;
 DMovement *move;
 DServer *serveur;
@@ -36,5 +37,5 @@ int PRIORITY_TSERVEUR = 30;
 int PRIORITY_TCONNECT = 20;
 int PRIORITY_TMOVE = 10;
 int PRIORITY_TENVOYER = 25;
-int PRIORITY_TVERIFIERBATTERIE = 80;
-
+int PRIORITY_TCOMPTEUR = 15;
+int PRIORITY_TVERIFIERBATTERIE = 1;

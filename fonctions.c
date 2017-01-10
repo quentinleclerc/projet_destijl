@@ -10,7 +10,10 @@ void envoyer(void * arg) {
         rt_printf("tenvoyer : Attente d'un message\n");
         if ((err = rt_queue_read(&queueMsgGUI, &msg, sizeof (DMessage), TM_INFINITE)) >= 0) {
             rt_printf("tenvoyer : envoi d'un message au moniteur\n");
-            serveur->send(serveur, msg);
+            /* Fermeture du serveur si la connexion a été perdue */
+            if (serveur->send(serveur, msg) < 0) {
+                serveur->close(serveur);
+            }
             msg->free(msg);
         } else {
             rt_printf("Error msg queue write: %s\n", strerror(-err));
@@ -29,6 +32,7 @@ void connecter(void * arg) {
         rt_sem_p(&semConnecterRobot, TM_INFINITE);
         rt_printf("tconnect : Ouverture de la communication avec le robot\n");
         status = robot->open_device(robot);
+        gestionCompteur(status);
 
         rt_mutex_acquire(&mutexEtat, TM_INFINITE);
         etatCommRobot = status;
@@ -37,7 +41,7 @@ void connecter(void * arg) {
         if (status == STATUS_OK) {
             status = robot->start_insecurely(robot);
             if (status == STATUS_OK){
-                rt_printf("tconnect : Robot démarrer\n");
+                rt_printf("tconnect : Robot démarré\n");
                 rt_printf("tconnect : Release sem verifier\n");
                 rt_sem_v(&semVerifierBatterie);    
             }
@@ -64,11 +68,6 @@ void communiquer(void *arg) {
     rt_printf("tserver : Début de l'exécution de serveur\n");
 
      while (1) {
-        
-        //rt_printf("tconnect : Attente du sémarphore semServeurOpen\n");
-        //rt_sem_p(&semServeurOpen, TM_INFINITE);
-        //rt_printf("tconnect : Ouverture de la communication avec le robot\n");
-        
         serveur->open(serveur, "8000");
         rt_printf("tserver : Connexion\n");
 
@@ -110,11 +109,8 @@ void communiquer(void *arg) {
         rt_mutex_release(&mutexEtat);
 
         // PRENDRE TOUS LES SEMAPHORES DE COMMUNICATION (batterie et watchdog)
-
-        serveur->close(serveur) ;
-        
-
         }
+        serveur->close(serveur) ;
     }
 }
 
@@ -135,6 +131,7 @@ void deplacer(void *arg) {
         rt_mutex_acquire(&mutexEtat, TM_INFINITE);
         status = etatCommRobot;
         rt_mutex_release(&mutexEtat);
+        gestionCompteur(status);
 
         if (status == STATUS_OK) {
             rt_mutex_acquire(&mutexMove, TM_INFINITE);
@@ -163,32 +160,20 @@ void deplacer(void *arg) {
             rt_mutex_release(&mutexMove);
 
             status = robot->set_motors(robot, gauche, droite);
+            gestionCompteur(status);
 
             if (status != STATUS_OK) {
-                if(nbErreurs < 3){
-                    rt_mutex_acquire(&mutexNbErreurs, TM_INFINITE);
-                    nbErreurs++;
-                    rt_mutex_release(&mutexEtat);
-                }
-
-                else{
-                    rt_mutex_acquire(&mutexEtat, TM_INFINITE);
-                    etatCommRobot = status;
-                    rt_mutex_release(&mutexEtat);
-
-                    message = d_new_message();
-                    message->put_state(message, status);
-
-                    rt_printf("tmove : Envoi message\n");
-                    if (write_in_queue(&queueMsgGUI, message, sizeof (DMessage)) < 0) {
-                        message->free(message);
-                    }
-                }
-            }
-            else{
-                rt_mutex_acquire(&mutexNbErreurs, TM_INFINITE);
-                nbErreurs++;
+                rt_mutex_acquire(&mutexEtat, TM_INFINITE);
+                etatCommRobot = status;
                 rt_mutex_release(&mutexEtat);
+
+                message = d_new_message();
+                message->put_state(message, status);
+
+                rt_printf("tmove : Envoi message\n");
+                if (write_in_queue(&queueMsgGUI, message, sizeof (DMessage)) < 0) {
+                    message->free(message);
+                }
             }
         }
     }
@@ -215,7 +200,8 @@ void verifierbatterie(void *arg) {
         rt_printf("tbatterie : Get semaphore batterie\n");
         
         status = robot->get_vbat(robot,&vbat);
-        
+        gestionCompteur(status);
+
         // status presque toujours 0, mais vbat risque -1
         if ((status == STATUS_OK)&&(vbat != BATTERY_LEVEL_UNKNOWN)) {
             batterie->set_level(batterie,vbat);
@@ -232,6 +218,34 @@ void verifierbatterie(void *arg) {
         rt_sem_v(&semVerifierBatterie);
     }
 }
+
+void threadCompteur(void * arg){
+    while(1){
+
+        rt_sem_p(&semCompteur, TM_INFINITE);
+        rt_sem_p(&semVerifierBatterie, TM_INFINITE);
+        rt_sem_p(&semConnecterRobot, TM_INFINITE);
+        //Prendre les autres sémaphores
+    }
+}
+
+void gestionCompteur(int status){
+    rt_mutex_acquire(&mutexCompteur, TM_INFINITE);
+    if(status == STATUS_OK){
+        compteur = 0;
+    }
+    else{
+        if(compteur < 3){
+            compteur ++;
+        }
+        else{
+            rt_sem_v(&semCompteur);
+        }
+    }
+    rt_mutex_release(&mutexCompteur);
+    
+}
+
 
 int write_in_queue(RT_QUEUE *msgQueue, void * data, int size) {
     void *msg;
