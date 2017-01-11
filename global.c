@@ -26,6 +26,11 @@ RT_SEM semVerifierBatterie;
 RT_SEM semCompteur;
 RT_SEM semDeplacer;
 RT_SEM semRechargerWD;
+RT_SEM semTraiterImage;
+RT_SEM semArena;
+
+
+
 
 RT_QUEUE queueMsgGUI;
 
