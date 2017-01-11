@@ -32,7 +32,8 @@ extern RT_SEM semVerifierBatterie;
 extern RT_SEM semCompteur;
 extern RT_SEM semDeplacer;
 extern RT_SEM semRechargerWD;
-
+extern RT_SEM semTraiterImage;
+extern RT_SEM semArena;
 /* @descripteurs des files de messages */
 extern RT_QUEUE queueMsgGUI;
 

@@ -48,6 +48,7 @@ void connecter(void * arg) {
 
                 rt_sem_v(&semVerifierBatterie);
                 rt_sem_v(&semRechargerWD);
+                rt_sem_v(&semTraiterImage);
                 rt_mutex_acquire(&mutexImage, TM_INFINITE);
                 etatImage = 0;
                 rt_mutex_release(&mutexImage);
@@ -68,52 +69,76 @@ void connecter(void * arg) {
 
 void communiquer(void *arg) {
     DMessage *msg = d_new_message();
-    int receive_ok = 1;
+    int size = 1;
     int num_msg = 0;
 
     rt_printf("tserver : Début de l'exécution de serveur\n");
     serveur->open(serveur, "8000");
     rt_printf("tserver : Connexion\n");
 
+    //Intérieur du while ?????
+    t_mutex_acquire(&mutexEtat, TM_INFINITE);
+    etatCommMoniteur = STATUS_OK;
+    rt_mutex_release(&mutexEtat);
 
-     while (1) {
 
-        rt_mutex_acquire(&mutexEtat, TM_INFINITE);
-        etatCommMoniteur = STATUS_OK;
-        rt_mutex_release(&mutexEtat);
+    while (size > 0) {
+        rt_printf("tserver : Attente d'un message\n");
+        size = serveur->receive(serveur, msg); //receive renvoie le nombre d'octets (0 ou inf si erreur)
+        num_msg++;
+        if(size >0) {
+            switch (msg->get_type(msg)) {
+                case MESSAGE_TYPE_ACTION:
+                    rt_printf("tserver : Le message %d reçu est une action\n",
+                            num_msg);
+                    DAction *action = d_new_action();
+                    action->from_message(action, msg);
+                    switch (action->get_order(action)) {
+                        case ACTION_CONNECT_ROBOT:
+                            rt_printf("tserver : Action connecter robot\n");
+                            rt_sem_v(&semConnecterRobot);
+                            break;
+                        case ACTION_FIND_ARENA:
+                            rt_printf("tserver : Action trouver Arène\n");
 
-        while (receive_ok > 0) {
-            rt_printf("tserver : Attente d'un message\n");
-            receive_ok = serveur->receive(serveur, msg); //receive renvoie le nombre d'octets (0 ou inf si erreur)
-            num_msg++;
-            if(receive_ok >0) {
-                switch (msg->get_type(msg)) {
-                    case MESSAGE_TYPE_ACTION:
-                        rt_printf("tserver : Le message %d reçu est une action\n",
-                                num_msg);
-                        DAction *action = d_new_action();
-                        action->from_message(action, msg);
-                        switch (action->get_order(action)) {
-                            case ACTION_CONNECT_ROBOT:
-                                rt_printf("tserver : Action connecter robot\n");
-                                rt_sem_v(&semConnecterRobot);
-                                break;
-                        }
-                        break;
-                    case MESSAGE_TYPE_MOVEMENT:
-                        rt_printf("tserver : Le message reçu %d est un mouvement\n",
-                                num_msg);
-                        rt_mutex_acquire(&mutexMove, TM_INFINITE);
-                        move->from_message(move, msg);
-                        move->print(move);
-                        rt_mutex_release(&mutexMove);
-                        break;
-                }
-            }
-        }
-    }
+                            rt_printf("tserver : Action trouver Arène\n");
+                            rt_sem_p(&semTraiterImage, TM_INFINITE);
+                            rt_sem_v(&semArena);
+                            break;
+                        case ACTION_ARENA_FAILED:
+                            rt_printf("tserver : Action arene failed\n");
+
+                            rt_printf("tserver : semTraiterImage libéré \n");
+                            rt_sem_v(&semTraiterImage);
+                            //Write Data sur la va glbale etat camera
+                            break;
+                        case ACTION_ARENA_IS_FOUND
+                            rt_sem_v(&semTraiterImage);
+                            //Write Data sur la va glbale etat camera
+                            break;
+                        case ACTION_COMPUTE_CONTINUOUSLY_POSITION:
+                            //Write Data sur la va glbale etatCalculPos
+                            break;
+                        case ACTION_STOP_COMPUTE_POSITION:
+                            //Write Data sur la va glbale etatCalculPos
+                            break;
+                    }
+                    break;
+                case MESSAGE_TYPE_MOVEMENT:
+                    rt_printf("tserver : Le message reçu %d est un mouvement\n",
+                            num_msg);
+                    rt_mutex_acquire(&mutexMove, TM_INFINITE);
+                    move->from_message(move, msg);
+                    move->print(move);
+                    rt_mutex_release(&mutexMove);
+                    break;
+                case MESSAGE_TYPE_MISSION:
+                    break;
+            } // _fin SWITCH
+        } // _fin de boucle "IF"
+    } // _fin de boucle "WHILE"
     serveur->close(serveur) ;
-}
+} // _fin de boucle "COMMUNIQUER"
 
 void deplacer(void *arg) {
     int status = 1;
@@ -313,7 +338,7 @@ void traiterimage(void *arg) {
         rt_mutex_acquire(&mutexImage, TM_INFINITE);
         status = etatImage;
         rt_mutex_release(&mutexImage);
-        
+
         if (status >= 0){
             rt_printf("ttraiterimage : Etat image %d\n", status);
             
