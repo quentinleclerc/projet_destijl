@@ -50,10 +50,6 @@ void connecter(void * arg) {
                 rt_sem_v(&semVerifierBatterie);
                 rt_sem_v(&semRechargerWD);
                 rt_sem_v(&semTraiterImage);
-
-                rt_mutex_acquire(&mutexImage, TM_INFINITE);
-                etatImage = 0;
-                rt_mutex_release(&mutexImage);
             }
         }
 
@@ -119,9 +115,15 @@ void communiquer(void *arg) {
                             //Write Data sur la va glbale etat camera
                             break;
                         case ACTION_COMPUTE_CONTINUOUSLY_POSITION:
-                            //Write Data sur la va glbale etatCalculPos
+                            rt_mutex_acquire(&mutexImage, TM_INFINITE);
+                            etatImage = ACTION_COMPUTE_CONTINUOUSLY_POSITION;
+                            rt_printf("tserver : mutexImage obtenu \n");
+                            rt_mutex_release(&mutexImage);
                             break;
                         case ACTION_STOP_COMPUTE_POSITION:
+                            rt_mutex_acquire(&mutexImage, TM_INFINITE);
+                            etatImage = ACTION_STOP_COMPUTE_POSITION;
+                            rt_mutex_release(&mutexImage);
                             //Write Data sur la va glbale etatCalculPos
                             break;
                     } // _fin SWITCH Action
@@ -145,7 +147,6 @@ void deplacer(void *arg) {
     int status = 1;
     int gauche;
     int droite;
-    DMessage *message;
 
     rt_printf("tmove : Debut de l'éxecution de periodique à 1s\n");
     rt_task_set_periodic(NULL, TM_NOW, 1000000000);
@@ -261,6 +262,8 @@ void threadCompteur(void * arg){
         rt_printf("tcompteur : sémaphore semRechargerWD obtenu\n");
         rt_sem_p(&semArena, TM_INFINITE);
         rt_printf("tcompteur : sémaphore semArena obtenu\n");
+        rt_sem_p(&semTraiterImage, TM_INFINITE);
+        rt_printf("tcompteur : sémaphore semTraiterImage obtenu\n");
     }
 }
 
@@ -307,9 +310,9 @@ void rechargerwd(void *arg) {
 }
 
 // Traiter image, en fonction de etatPosition
-// -1 pas de traitement, 0 image sans position, 1 image avec position
+// 0 image sans position, ACTION_POSITION... image avec position
 void traiterimage(void *arg) {
-    int status = -1;
+    int status = 0;
     DImage *image;
     DJpegimage *jpegimage;
     DMessage *message;
@@ -324,31 +327,54 @@ void traiterimage(void *arg) {
         rt_task_wait_period(NULL);
         rt_printf("ttraiterimage : Activation périodique\n");
         
+        rt_printf("ttraiterimage : Attente du sémaphore semTraiterImage\n");
+        rt_sem_p(&semTraiterImage, TM_INFINITE);
+        rt_printf("ttraiterimage : Sémaphore semTraiterImage obtenu\n");
+        
+        image = d_new_image();
+        jpegimage = d_new_jpegimage();
+        
+        camera->get_frame(camera,image);
+           
+        /*pour savoir s'il s'agit du calcul position*/
         rt_mutex_acquire(&mutexImage, TM_INFINITE);
         status = etatImage;
         rt_mutex_release(&mutexImage);
-
-        if (status >= 0){
-            rt_printf("ttraiterimage : Etat image %d\n", status);
+        
+        if (status == ACTION_COMPUTE_CONTINUOUSLY_POSITION){
+       
+            rt_printf("ttraiterimage : position\n");
             
-            image = d_new_image();
-            jpegimage = d_new_jpegimage();
-
-            camera->get_frame(camera,image);
+            position = image->compute_robot_position(image,NULL);
             
-            jpegimage->compress(jpegimage,image);
+            if (position != NULL){
+            // pas tester ici  !!!!!!!!
+                d_imageshop_draw_position(image,position);
+                
+                message = d_new_message();
+                message->put_position(message, position);
 
-            message = d_new_message();
-            message->put_jpeg_image(message, jpegimage);
-
-            rt_printf("ttraiterimage : Envoi message\n");
-            if (write_in_queue(&queueMsgGUI, message, sizeof (DMessage)) < 0) {
-                message->free(message);
+                rt_printf("ttraiterimage : Envoi message position\n");
+                if (write_in_queue(&queueMsgGUI, message, sizeof (DMessage)) < 0) {
+                    message->free(message);
+                }
             }
             
-            image->free(image);
-            jpegimage->free(jpegimage);
         }
+        
+        jpegimage->compress(jpegimage,image);
+
+        message = d_new_message();
+        message->put_jpeg_image(message, jpegimage);
+
+        rt_printf("ttraiterimage : Envoi message image\n");
+        if (write_in_queue(&queueMsgGUI, message, sizeof (DMessage)) < 0) {
+            message->free(message);
+        }
+        
+        image->free(image);
+        jpegimage->free(jpegimage);
+        rt_sem_v(&semTraiterImage);
     }
 }
 
