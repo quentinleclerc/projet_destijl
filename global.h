@@ -19,12 +19,14 @@ extern RT_TASK tverifierbatterie;
 extern RT_TASK tcompteur;
 extern RT_TASK trechargerwd;
 extern RT_TASK ttraiterimage;
+extern RT_TASK tcalibrationarena;
 
 /* @descripteurs des mutex */
 extern RT_MUTEX mutexEtat;
 extern RT_MUTEX mutexMove;
 extern RT_MUTEX mutexCompteur;
 extern RT_MUTEX mutexImage;
+extern RT_MUTEX mutexArena;
 
 /* @descripteurs des sempahore */
 extern RT_SEM semConnecterRobot;
@@ -61,6 +63,6 @@ extern int PRIORITY_TVERIFIERBATTERIE;
 extern int PRIORITY_TCOMPTEUR;
 extern int PRIORITY_TRECHARGERWD;
 extern int PRIORITY_TTRAITERIMAGE;
-
+extern int PRIORITY_TARENA;
 #endif	/* GLOBAL_H */
 

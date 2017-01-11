@@ -22,6 +22,7 @@ extern "C" {
         void threadCompteur(void * arg);
         void rechargerwd(void *arg);
         void traiterimage(void *arg);
+        void calibrationArene(void *arg);
 
 #ifdef	__cplusplus
 }
