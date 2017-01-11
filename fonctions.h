@@ -20,6 +20,7 @@ extern "C" {
         void envoyer(void *arg);
         void verifierbatterie(void *arg);
         void rechargerwd(void *arg);
+        void traiterimage(void *arg);
 #ifdef	__cplusplus
 }
 #endif

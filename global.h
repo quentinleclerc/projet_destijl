@@ -17,10 +17,12 @@ extern RT_TASK tmove;
 extern RT_TASK tenvoyer;
 extern RT_TASK tverifierbatterie;
 extern RT_TASK trechargerwd;
+extern RT_TASK ttraiterimage;
 
 /* @descripteurs des mutex */
 extern RT_MUTEX mutexEtat;
 extern RT_MUTEX mutexMove;
+extern RT_MUTEX mutexImage;
 
 /* @descripteurs des sempahore */
 extern RT_SEM semConnecterRobot;
@@ -33,9 +35,11 @@ extern RT_QUEUE queueMsgGUI;
 /* @variables partagées */
 extern int etatCommMoniteur;
 extern int etatCommRobot;
+extern int etatImage;
 extern DServer *serveur;
 extern DRobot *robot;
 extern DMovement *move;
+extern DCamera *camera;
 
 /* @constantes */
 extern int MSG_QUEUE_SIZE;
@@ -45,6 +49,7 @@ extern int PRIORITY_TMOVE;
 extern int PRIORITY_TENVOYER;
 extern int PRIORITY_TVERIFIERBATTERIE;
 extern int PRIORITY_TRECHARGERWD;
+extern int PRIORITY_TTRAITERIMAGE;
 
 #endif	/* GLOBAL_H */
 

@@ -41,7 +41,10 @@ void connecter(void * arg) {
                 rt_printf("tconnect : Robot démarrer\n");
                 rt_printf("tconnect : Release sem verifier\n");
                 rt_sem_v(&semVerifierBatterie);
-                rt_sem_v(&semRechargerWD);    
+                rt_sem_v(&semRechargerWD);
+                rt_mutex_acquire(&mutexImage, TM_INFINITE);
+                etatImage = 0;
+                rt_mutex_release(&mutexImage);
             }
         }
 
@@ -229,6 +232,51 @@ void rechargerwd(void *arg) {
     }
 }
 
+// Traiter image, en fonction de etatPosition
+// -1 pas de traitement, 0 image sans position, 1 image avec position
+void traiterimage(void *arg) {
+    int status = -1;
+    DImage *image;
+    DJpegimage *jpegimage;
+    DMessage *message;
+    
+    camera->open(camera);
+
+    rt_printf("ttraiterimage : Debut de l'éxecution de periodique à 600ms\n");
+    rt_task_set_periodic(NULL, TM_NOW, 600000000);
+
+    while(1){
+        /* Attente de l'activation périodique */
+        rt_task_wait_period(NULL);
+        rt_printf("ttraiterimage : Activation périodique\n");
+        
+        rt_mutex_acquire(&mutexImage, TM_INFINITE);
+        status = etatImage;
+        rt_mutex_release(&mutexImage);
+        
+        if (status >= 0){
+            rt_printf("ttraiterimage : Etat image %d\n", status);
+            
+            image = d_new_image();
+            jpegimage = d_new_jpegimage();
+
+            camera->get_frame(camera,image);
+            
+            jpegimage->compress(jpegimage,image);
+
+            message = d_new_message();
+            message->put_jpeg_image(message, jpegimage);
+
+            rt_printf("ttraiterimage : Envoi message\n");
+            if (write_in_queue(&queueMsgGUI, message, sizeof (DMessage)) < 0) {
+                message->free(message);
+            }
+            
+            image->free(image);
+            jpegimage->free(jpegimage);
+        }
+    }
+}
 
 int write_in_queue(RT_QUEUE *msgQueue, void * data, int size) {
     void *msg;
