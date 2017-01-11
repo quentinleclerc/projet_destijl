@@ -36,10 +36,12 @@ void connecter(void * arg) {
 
         if (status == STATUS_OK) {
             status = robot->start_insecurely(robot);
+            //status = robot->start(robot);
             if (status == STATUS_OK){
                 rt_printf("tconnect : Robot démarrer\n");
                 rt_printf("tconnect : Release sem verifier\n");
-                rt_sem_v(&semVerifierBatterie);    
+                rt_sem_v(&semVerifierBatterie);
+                rt_sem_v(&semRechargerWD);    
             }
         }
 
@@ -202,6 +204,28 @@ void verifierbatterie(void *arg) {
         }
         
         rt_sem_v(&semVerifierBatterie);
+    }
+}
+
+// Recharger WD periode 1s+-100ms
+void rechargerwd(void *arg) {
+
+    rt_printf("trechargerwd : Debut de l'éxecution de periodique à 1s\n");
+    rt_task_set_periodic(NULL, TM_NOW, 1000000000);
+
+    while(1){
+        /* Attente de l'activation périodique */
+        rt_task_wait_period(NULL);
+        rt_printf("trechargerwd : Activation périodique\n");
+
+        // attente semaphore
+        rt_printf("trechargerwd : Attente du sémarphore semRechargerWD\n");
+        rt_sem_p(&semRechargerWD, TM_INFINITE);
+        rt_printf("trechargerwd : Get semaphore semRechargerWD\n");
+
+        robot->reload_wdt(robot);
+
+        rt_sem_v(&semRechargerWD);
     }
 }
 

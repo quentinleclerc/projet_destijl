@@ -71,6 +71,10 @@ void initStruct(void) {
         rt_printf("Error semaphore create: %s\n", strerror(-err));
         exit(EXIT_FAILURE);
     }
+    if (err = rt_sem_create(&semRechargerWD, NULL, 0, S_FIFO)) {
+        rt_printf("Error semaphore create: %s\n", strerror(-err));
+        exit(EXIT_FAILURE);
+    }
 
     /* Creation des taches */
     if (err = rt_task_create(&tServeur, NULL, 0, PRIORITY_TSERVEUR, 0)) {
@@ -90,6 +94,10 @@ void initStruct(void) {
         exit(EXIT_FAILURE);
     }
     if (err = rt_task_create(&tverifierbatterie, NULL, 0, PRIORITY_TVERIFIERBATTERIE, 0)) {
+        rt_printf("Error task create: %s\n", strerror(-err));
+        exit(EXIT_FAILURE);
+    }
+    if (err = rt_task_create(&trechargerwd, NULL, 0, PRIORITY_TRECHARGERWD, 0)) {
         rt_printf("Error task create: %s\n", strerror(-err));
         exit(EXIT_FAILURE);
     }
@@ -125,6 +133,10 @@ void startTasks() {
         exit(EXIT_FAILURE);
     }
     if (err = rt_task_start(&tverifierbatterie, &verifierbatterie, NULL)) {
+        rt_printf("Error task start: %s\n", strerror(-err));
+        exit(EXIT_FAILURE);
+    }
+    if (err = rt_task_start(&trechargerwd, &rechargerwd, NULL)) {
         rt_printf("Error task start: %s\n", strerror(-err));
         exit(EXIT_FAILURE);
     }

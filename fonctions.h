@@ -19,6 +19,7 @@ extern "C" {
         void deplacer(void *arg);
         void envoyer(void *arg);
         void verifierbatterie(void *arg);
+        void rechargerwd(void *arg);
 #ifdef	__cplusplus
 }
 #endif

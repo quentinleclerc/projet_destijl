@@ -12,12 +12,14 @@ RT_TASK tconnect;
 RT_TASK tmove;
 RT_TASK tenvoyer;
 RT_TASK tverifierbatterie;
+RT_TASK trechargerwd;
 
 RT_MUTEX mutexEtat;
 RT_MUTEX mutexMove;
 
 RT_SEM semConnecterRobot;
 RT_SEM semVerifierBatterie;
+RT_SEM semRechargerWD;
 
 RT_QUEUE queueMsgGUI;
 
@@ -33,4 +35,5 @@ int PRIORITY_TSERVEUR = 30;
 int PRIORITY_TCONNECT = 20;
 int PRIORITY_TMOVE = 10;
 int PRIORITY_TENVOYER = 25;
-int PRIORITY_TVERIFIERBATTERIE = 80;
+int PRIORITY_TVERIFIERBATTERIE = 18;
+int PRIORITY_TRECHARGERWD = 40;
