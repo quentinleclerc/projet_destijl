@@ -27,6 +27,7 @@ extern RT_MUTEX mutexCompteur;
 extern RT_SEM semConnecterRobot;
 extern RT_SEM semVerifierBatterie;
 extern RT_SEM semCompteur;
+extern RT_SEM semDeplacer;
 
 /* @descripteurs des files de messages */
 extern RT_QUEUE queueMsgGUI;
@@ -34,7 +35,7 @@ extern RT_QUEUE queueMsgGUI;
 /* @variables partagées */
 extern int etatCommMoniteur;
 extern int etatCommRobot;
-extern int nbErreurs;
+extern int compteur;
 extern DServer *serveur;
 extern DRobot *robot;
 extern DMovement *move;
