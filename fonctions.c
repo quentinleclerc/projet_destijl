@@ -34,11 +34,6 @@ void connecter(void * arg) {
         status = robot->open_device(robot);
         gestionCompteur(status);
 
-
-        /*rt_mutex_acquire(&mutexEtat, TM_INFINITE);
-        etatCommRobot = status;
-        rt_mutex_release(&mutexEtat);*/
-
         if (status == STATUS_OK) {
             status = robot->start_insecurely(robot);
             //status = robot->start(robot);
@@ -49,7 +44,6 @@ void connecter(void * arg) {
                 rt_sem_v(&semDeplacer);
                 rt_sem_v(&semVerifierBatterie);
                 rt_sem_v(&semRechargerWD);
-                rt_sem_v(&semTraiterImage);
             }
         }
 
@@ -69,16 +63,18 @@ void communiquer(void *arg) {
     DMessage *msg = d_new_message();
     int size = 1;
     int num_msg = 0;
+    int compteFindArena = 0;
 
     rt_printf("tserver : Début de l'exécution de serveur\n");
     serveur->open(serveur, "8000");
     rt_printf("tserver : Connexion\n");
+    rt_sem_v(&semTraiterImage);
 
     //Intérieur du while ?????
+
     rt_mutex_acquire(&mutexEtat, TM_INFINITE);
     etatCommMoniteur = STATUS_OK;
     rt_mutex_release(&mutexEtat);
-
 
     while (size > 0) {
         rt_printf("tserver : Attente d'un message\n");
@@ -97,13 +93,14 @@ void communiquer(void *arg) {
                             rt_sem_v(&semConnecterRobot);
                             break;
                         case ACTION_FIND_ARENA:
+                            compteFindArena++;
                             rt_printf("tserver : Action trouver Arène\n");
-
-                            rt_printf("tserver : Action trouver Arène\n");
-                            rt_sem_p(&semTraiterImage, TM_INFINITE);
+                            if(compteFindArena <= 1)
+                                rt_sem_p(&semTraiterImage, TM_INFINITE);
                             rt_sem_v(&semArena);
                             break;
                         case ACTION_ARENA_FAILED:
+                            compteFindArena = 0;
                             rt_printf("tserver : Action arene failed\n");
 
                             rt_printf("tserver : semTraiterImage libéré \n");
@@ -111,6 +108,7 @@ void communiquer(void *arg) {
                             //Write Data sur la va glbale etat camera
                             break;
                         case ACTION_ARENA_IS_FOUND:
+                            compteFindArena = 0;
                             rt_sem_v(&semTraiterImage);
                             //Write Data sur la va glbale etat camera
                             break;

@@ -205,5 +205,5 @@ void deleteTasks() {
     rt_task_delete(&tcompteur);
     rt_task_delete(&trechargerwd);
     rt_task_delete(&ttraiterimage);
-    rt_task_delete(&calibrationArene);
+    rt_task_delete(&tcalibrationarena);
 }
