@@ -167,10 +167,11 @@ void verifierbatterie(void *arg) {
     int status = 0;
     int vbat;
     DMessage *message;
+    DBattery *batterie;
 
     rt_printf("tbatterie : Debut de l'éxecution de periodique à 250ms\n");
     rt_task_set_periodic(NULL, TM_NOW, 250000000);
-       
+    
     
     while(1){
         /* Attente de l'activation périodique */
@@ -186,6 +187,7 @@ void verifierbatterie(void *arg) {
         
         // status presque toujours 0, mais vbat risque -1
         if ((status == STATUS_OK)&&(vbat != BATTERY_LEVEL_UNKNOWN)) {
+            batterie = d_new_battery();
             batterie->set_level(batterie,vbat);
             
             message = d_new_message();
@@ -195,6 +197,8 @@ void verifierbatterie(void *arg) {
             if (write_in_queue(&queueMsgGUI, message, sizeof (DMessage)) < 0) {
                 message->free(message);
             }
+            
+            batterie->free(batterie);
         }
         
         rt_sem_v(&semVerifierBatterie);
