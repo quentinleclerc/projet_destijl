@@ -35,9 +35,9 @@ void connecter(void * arg) {
         gestionCompteur(status);
 
 
-        rt_mutex_acquire(&mutexEtat, TM_INFINITE);
+        /*rt_mutex_acquire(&mutexEtat, TM_INFINITE);
         etatCommRobot = status;
-        rt_mutex_release(&mutexEtat);
+        rt_mutex_release(&mutexEtat);*/
 
         if (status == STATUS_OK) {
             status = robot->start_insecurely(robot);
@@ -46,9 +46,11 @@ void connecter(void * arg) {
                 rt_printf("tconnect : Robot démarré\n");
                 rt_printf("tconnect : Release sem verifier\n");
 
+                rt_sem_v(&semDeplacer);
                 rt_sem_v(&semVerifierBatterie);
                 rt_sem_v(&semRechargerWD);
                 rt_sem_v(&semTraiterImage);
+
                 rt_mutex_acquire(&mutexImage, TM_INFINITE);
                 etatImage = 0;
                 rt_mutex_release(&mutexImage);
@@ -77,7 +79,7 @@ void communiquer(void *arg) {
     rt_printf("tserver : Connexion\n");
 
     //Intérieur du while ?????
-    t_mutex_acquire(&mutexEtat, TM_INFINITE);
+    rt_mutex_acquire(&mutexEtat, TM_INFINITE);
     etatCommMoniteur = STATUS_OK;
     rt_mutex_release(&mutexEtat);
 
@@ -112,7 +114,7 @@ void communiquer(void *arg) {
                             rt_sem_v(&semTraiterImage);
                             //Write Data sur la va glbale etat camera
                             break;
-                        case ACTION_ARENA_IS_FOUND
+                        case ACTION_ARENA_IS_FOUND:
                             rt_sem_v(&semTraiterImage);
                             //Write Data sur la va glbale etat camera
                             break;
@@ -122,8 +124,7 @@ void communiquer(void *arg) {
                         case ACTION_STOP_COMPUTE_POSITION:
                             //Write Data sur la va glbale etatCalculPos
                             break;
-                    }
-                    break;
+                    } // _fin SWITCH Action
                 case MESSAGE_TYPE_MOVEMENT:
                     rt_printf("tserver : Le message reçu %d est un mouvement\n",
                             num_msg);
@@ -134,7 +135,7 @@ void communiquer(void *arg) {
                     break;
                 case MESSAGE_TYPE_MISSION:
                     break;
-            } // _fin SWITCH
+            } // _fin SWITCH type message
         } // _fin de boucle "IF"
     } // _fin de boucle "WHILE"
     serveur->close(serveur) ;
@@ -154,11 +155,6 @@ void deplacer(void *arg) {
         rt_task_wait_period(NULL);
         rt_printf("tmove : Activation périodique\n");
 
-/*
-        rt_mutex_acquire(&mutexEtat, TM_INFINITE);
-        status = etatCommRobot;
-        rt_mutex_release(&mutexEtat);
-*/
         rt_printf("tmove : Attente du sémaphore semDeplacer\n");
         rt_sem_p(&semDeplacer, TM_INFINITE);
         rt_printf("tmove : Sémaphore semDeplacer obtenu\n");
@@ -192,17 +188,6 @@ void deplacer(void *arg) {
         status = robot->set_motors(robot, gauche, droite);
         gestionCompteur(status);
 
-        rt_mutex_acquire(&mutexEtat, TM_INFINITE);
-        etatCommRobot = status;
-        rt_mutex_release(&mutexEtat);
-
-        message = d_new_message();
-        message->put_state(message, status);
-
-        rt_printf("tmove : Envoi message\n");
-        if (write_in_queue(&queueMsgGUI, message, sizeof (DMessage)) < 0) {
-            message->free(message);
-        }
         rt_sem_v(&semDeplacer);
     }
 }
@@ -274,10 +259,13 @@ void threadCompteur(void * arg){
         rt_printf("tcompteur : sémaphore semDeplacer obtenu, robot stoppé\n");
         rt_sem_p(&semRechargerWD, TM_INFINITE);
         rt_printf("tcompteur : sémaphore semRechargerWD obtenu\n");
+        rt_sem_p(&semArena, TM_INFINITE);
+        rt_printf("tcompteur : sémaphore semArena obtenu\n");
     }
 }
 
 void gestionCompteur(int status){
+    rt_printf("tcompteur : appel, status = %d\n", status);
     rt_mutex_acquire(&mutexCompteur, TM_INFINITE);
     if(status == STATUS_OK){
         compteur = 0;
@@ -288,6 +276,7 @@ void gestionCompteur(int status){
             rt_printf("gestionCompteur : compteur++, compteur = %d\n", compteur);
         }
         else{
+            rt_printf("tcompteur : relache semCompteur\n");
             rt_sem_v(&semCompteur);
         }
     }
@@ -360,6 +349,46 @@ void traiterimage(void *arg) {
             image->free(image);
             jpegimage->free(jpegimage);
         }
+    }
+}
+
+void calibrationArene(void *arg) {
+    DImage *image;
+    DMessage *message;
+    DJpegimage *jpegim;
+
+    while(1){
+        // Attente de l'activation périodique 
+        rt_task_wait_period(NULL);
+        rt_printf("tcalibrationarena : Activation apériodique\n");
+
+        // attente semaphore
+        rt_printf("tcalibrationarena : Attente du sémarphore semChercherArene\n");
+        rt_sem_p(&semArena, TM_INFINITE);
+        rt_printf("tcalibrationarena : Get semaphore arene\n");
+
+
+        image = d_new_image();
+        jpegim = d_new_jpegimage();
+        camera->get_frame(camera,image);
+
+        rt_mutex_acquire(&mutexArena, TM_INFINITE);
+        arena = image->compute_arena_position(image);
+        d_imageshop_draw_arena(image,arena);//imageshop
+        rt_mutex_release(&mutexArena);
+
+        jpegim->compress(jpegim,image);
+
+        image->free(image); //il en faut ou pas? diff entre free et release?
+
+        message = d_new_message();
+        message->put_jpeg_image(message, jpegim);
+
+        rt_printf("tcalibrationarena : Envoi message\n");
+        if (write_in_queue(&queueMsgGUI, message, sizeof (DMessage)) < 0) {
+            message->free(message);
+        }
+
     }
 }
 

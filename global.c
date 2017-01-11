@@ -15,11 +15,13 @@ RT_TASK tverifierbatterie;
 RT_TASK tcompteur;
 RT_TASK trechargerwd;
 RT_TASK ttraiterimage;
+RT_TASK tcalibrationarena;
 
 RT_MUTEX mutexEtat;
 RT_MUTEX mutexMove;
 RT_MUTEX mutexCompteur;
 RT_MUTEX mutexImage;
+RT_MUTEX mutexArena;
 
 RT_SEM semConnecterRobot;
 RT_SEM semVerifierBatterie;
@@ -39,6 +41,7 @@ int etatCommRobot = 1;
 int compteur = 0;
 int etatImage = -1;
 
+DArena *arena;
 DRobot *robot;
 DMovement *move;
 DServer *serveur;
@@ -53,5 +56,6 @@ int PRIORITY_TCONNECT           = 30;
 int PRIORITY_TCOMPTEUR          = 25;
 int PRIORITY_TMOVE              = 20;
 int PRIORITY_TTRAITERIMAGE      = 17;
-int PRIORITY_TVERIFIERBATTERIE  = 1;
+int PRIORITY_TARENA				= 15;
+int PRIORITY_TVERIFIERBATTERIE  = 12;
 
