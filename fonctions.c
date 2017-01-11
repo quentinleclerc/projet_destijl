@@ -41,11 +41,16 @@ void connecter(void * arg) {
 
         if (status == STATUS_OK) {
             status = robot->start_insecurely(robot);
+            //status = robot->start(robot);
             if (status == STATUS_OK){
                 rt_printf("tconnect : Robot démarré\n");
                 rt_printf("tconnect : Release sem verifier\n");
-                rt_sem_v(&semVerifierBatterie); 
-                rt_sem_v(&semDeplacer);    
+
+                rt_sem_v(&semVerifierBatterie);
+                rt_sem_v(&semRechargerWD);
+                rt_mutex_acquire(&mutexImage, TM_INFINITE);
+                etatImage = 0;
+                rt_mutex_release(&mutexImage);
             }
         }
 
@@ -182,6 +187,7 @@ void verifierbatterie(void *arg) {
     int status = 0;
     int vbat;
     DMessage *message;
+    DBattery *batterie;
 
     rt_printf("tbatterie : Debut de l'éxecution de periodique à 250ms\n");
     rt_task_set_periodic(NULL, TM_NOW, 250000000);
@@ -201,6 +207,7 @@ void verifierbatterie(void *arg) {
 
         // status presque toujours 0, mais vbat risque -1
         if ((status == STATUS_OK)&&(vbat != BATTERY_LEVEL_UNKNOWN)) {
+            batterie = d_new_battery();
             batterie->set_level(batterie,vbat);
             
             message = d_new_message();
@@ -210,6 +217,8 @@ void verifierbatterie(void *arg) {
             if (write_in_queue(&queueMsgGUI, message, sizeof (DMessage)) < 0) {
                 message->free(message);
             }
+            
+            batterie->free(batterie);
         }
         
         rt_sem_v(&semVerifierBatterie);
@@ -238,6 +247,8 @@ void threadCompteur(void * arg){
         rt_printf("tcompteur : sémaphore semVerifierBatterie obtenu\n");
         rt_sem_p(&semDeplacer, TM_INFINITE);
         rt_printf("tcompteur : sémaphore semDeplacer obtenu, robot stoppé\n");
+        rt_sem_p(&semRechargerWD, TM_INFINITE);
+        rt_printf("tcompteur : sémaphore semRechargerWD obtenu\n");
     }
 }
 
@@ -259,6 +270,73 @@ void gestionCompteur(int status){
     
 }
 
+// Recharger WD periode 1s+-100ms
+void rechargerwd(void *arg) {
+
+    rt_printf("trechargerwd : Debut de l'éxecution de periodique à 1s\n");
+    rt_task_set_periodic(NULL, TM_NOW, 1000000000);
+
+    while(1){
+        /* Attente de l'activation périodique */
+        rt_task_wait_period(NULL);
+        rt_printf("trechargerwd : Activation périodique\n");
+
+        // attente semaphore
+        rt_printf("trechargerwd : Attente du sémarphore semRechargerWD\n");
+        rt_sem_p(&semRechargerWD, TM_INFINITE);
+        rt_printf("trechargerwd : Get semaphore semRechargerWD\n");
+
+        robot->reload_wdt(robot);
+
+        rt_sem_v(&semRechargerWD);
+    }
+}
+
+// Traiter image, en fonction de etatPosition
+// -1 pas de traitement, 0 image sans position, 1 image avec position
+void traiterimage(void *arg) {
+    int status = -1;
+    DImage *image;
+    DJpegimage *jpegimage;
+    DMessage *message;
+    
+    camera->open(camera);
+
+    rt_printf("ttraiterimage : Debut de l'éxecution de periodique à 600ms\n");
+    rt_task_set_periodic(NULL, TM_NOW, 600000000);
+
+    while(1){
+        /* Attente de l'activation périodique */
+        rt_task_wait_period(NULL);
+        rt_printf("ttraiterimage : Activation périodique\n");
+        
+        rt_mutex_acquire(&mutexImage, TM_INFINITE);
+        status = etatImage;
+        rt_mutex_release(&mutexImage);
+        
+        if (status >= 0){
+            rt_printf("ttraiterimage : Etat image %d\n", status);
+            
+            image = d_new_image();
+            jpegimage = d_new_jpegimage();
+
+            camera->get_frame(camera,image);
+            
+            jpegimage->compress(jpegimage,image);
+
+            message = d_new_message();
+            message->put_jpeg_image(message, jpegimage);
+
+            rt_printf("ttraiterimage : Envoi message\n");
+            if (write_in_queue(&queueMsgGUI, message, sizeof (DMessage)) < 0) {
+                message->free(message);
+            }
+            
+            image->free(image);
+            jpegimage->free(jpegimage);
+        }
+    }
+}
 
 int write_in_queue(RT_QUEUE *msgQueue, void * data, int size) {
     void *msg;

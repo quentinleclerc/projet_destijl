@@ -61,12 +61,16 @@ void initStruct(void) {
         rt_printf("Error mutex create: %s\n", strerror(-err));
         exit(EXIT_FAILURE);
     }
-        if (err = rt_mutex_create(&mutexCompteur, NULL)) {
+    if (err = rt_mutex_create(&mutexCompteur, NULL)) {
+        rt_printf("Error mutex create: %s\n", strerror(-err));
+        exit(EXIT_FAILURE);
+    }
+   if (err = rt_mutex_create(&mutexImage, NULL)) {
         rt_printf("Error mutex create: %s\n", strerror(-err));
         exit(EXIT_FAILURE);
     }
 
-    /* Creation du semaphore */
+    /* Creation des semaphores */
     if (err = rt_sem_create(&semCompteur, NULL, 0, S_FIFO)) {
         rt_printf("Error semaphore create: %s\n", strerror(-err));
         exit(EXIT_FAILURE);
@@ -83,7 +87,10 @@ void initStruct(void) {
         rt_printf("Error semaphore create: %s\n", strerror(-err));
         exit(EXIT_FAILURE);
     }
-
+    if (err = rt_sem_create(&semRechargerWD, NULL, 0, S_FIFO)) {
+        rt_printf("Error semaphore create: %s\n", strerror(-err));
+        exit(EXIT_FAILURE);
+    }
 
     /* Creation des taches */
     if (err = rt_task_create(&tServeur, NULL, 0, PRIORITY_TSERVEUR, 0)) {
@@ -107,6 +114,14 @@ void initStruct(void) {
         exit(EXIT_FAILURE);
     }
     if (err = rt_task_create(&tcompteur, NULL, 0, PRIORITY_TCOMPTEUR, 0)) {
+       rt_printf("Error task create: %s\n", strerror(-err));
+        exit(EXIT_FAILURE);
+    }
+    if (err = rt_task_create(&trechargerwd, NULL, 0, PRIORITY_TRECHARGERWD, 0)) {
+        rt_printf("Error task create: %s\n", strerror(-err));
+        exit(EXIT_FAILURE);
+    }
+    if (err = rt_task_create(&ttraiterimage, NULL, 0, PRIORITY_TTRAITERIMAGE, 0)) {
         rt_printf("Error task create: %s\n", strerror(-err));
         exit(EXIT_FAILURE);
     }
@@ -121,7 +136,7 @@ void initStruct(void) {
     robot = d_new_robot();
     move = d_new_movement();
     serveur = d_new_server();
-    batterie = d_new_battery();
+    camera = d_new_camera();
 }
 
 void startTasks() {
@@ -150,6 +165,14 @@ void startTasks() {
         rt_printf("Error task start: %s\n", strerror(-err));
         exit(EXIT_FAILURE);
     }
+    if (err = rt_task_start(&trechargerwd, &rechargerwd, NULL)) {
+        rt_printf("Error task start: %s\n", strerror(-err));
+        exit(EXIT_FAILURE);
+    }
+    if (err = rt_task_start(&ttraiterimage, &traiterimage, NULL)) {
+        rt_printf("Error task start: %s\n", strerror(-err));
+        exit(EXIT_FAILURE);
+    }
 }
 
 void deleteTasks() {
@@ -158,4 +181,6 @@ void deleteTasks() {
     rt_task_delete(&tmove);
     rt_task_delete(&tverifierbatterie);
     rt_task_delete(&tcompteur);
+    rt_task_delete(&trechargerwd);
+    rt_task_delete(&ttraiterimage);
 }
