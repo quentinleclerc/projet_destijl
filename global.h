@@ -34,6 +34,7 @@ extern RT_SEM semDeplacer;
 extern RT_SEM semRechargerWD;
 extern RT_SEM semTraiterImage;
 extern RT_SEM semArena;
+
 /* @descripteurs des files de messages */
 extern RT_QUEUE queueMsgGUI;
 
@@ -47,6 +48,8 @@ extern DServer *serveur;
 extern DRobot *robot;
 extern DMovement *move;
 extern DCamera *camera;
+extern DArena *arena;
+extern DPosition *position;
 
 /* @constantes */
 extern int MSG_QUEUE_SIZE;

@@ -145,6 +145,8 @@ void initStruct(void) {
     move = d_new_movement();
     serveur = d_new_server();
     camera = d_new_camera();
+    arena = d_new_arena();
+    position = d_new_position();
 }
 
 void startTasks() {
