@@ -1,6 +1,7 @@
 #include "fonctions.h"
 
 int write_in_queue(RT_QUEUE *msgQueue, void * data, int size);
+void gestionCompteur(int status);
 
 void envoyer(void * arg) {
     DMessage *msg;
@@ -10,6 +11,7 @@ void envoyer(void * arg) {
         rt_printf("tenvoyer : Attente d'un message\n");
         if ((err = rt_queue_read(&queueMsgGUI, &msg, sizeof (DMessage), TM_INFINITE)) >= 0) {
             rt_printf("tenvoyer : envoi d'un message au moniteur\n");
+            /* Fermeture du serveur si la connexion a été perdue */
             serveur->send(serveur, msg);
             msg->free(msg);
         } else {
@@ -25,10 +27,13 @@ void connecter(void * arg) {
     rt_printf("tconnect : Debut de l'exécution de tconnect\n");
 
     while (1) {
-        rt_printf("tconnect : Attente du sémarphore semConnecterRobot\n");
+        rt_printf("tconnect : Attente du sémaphore semConnecterRobot\n");
         rt_sem_p(&semConnecterRobot, TM_INFINITE);
         rt_printf("tconnect : Ouverture de la communication avec le robot\n");
+
         status = robot->open_device(robot);
+        gestionCompteur(status);
+
 
         rt_mutex_acquire(&mutexEtat, TM_INFINITE);
         etatCommRobot = status;
@@ -38,8 +43,9 @@ void connecter(void * arg) {
             status = robot->start_insecurely(robot);
             //status = robot->start(robot);
             if (status == STATUS_OK){
-                rt_printf("tconnect : Robot démarrer\n");
+                rt_printf("tconnect : Robot démarré\n");
                 rt_printf("tconnect : Release sem verifier\n");
+
                 rt_sem_v(&semVerifierBatterie);
                 rt_sem_v(&semRechargerWD);
                 rt_mutex_acquire(&mutexImage, TM_INFINITE);
@@ -62,46 +68,51 @@ void connecter(void * arg) {
 
 void communiquer(void *arg) {
     DMessage *msg = d_new_message();
-    int var1 = 1;
+    int receive_ok = 1;
     int num_msg = 0;
 
     rt_printf("tserver : Début de l'exécution de serveur\n");
     serveur->open(serveur, "8000");
     rt_printf("tserver : Connexion\n");
 
-    rt_mutex_acquire(&mutexEtat, TM_INFINITE);
-    etatCommMoniteur = 0;
-    rt_mutex_release(&mutexEtat);
 
-    while (var1 > 0) {
-        rt_printf("tserver : Attente d'un message\n");
-        var1 = serveur->receive(serveur, msg);
-        num_msg++;
-        if (var1 > 0) {
-            switch (msg->get_type(msg)) {
-                case MESSAGE_TYPE_ACTION:
-                    rt_printf("tserver : Le message %d reçu est une action\n",
-                            num_msg);
-                    DAction *action = d_new_action();
-                    action->from_message(action, msg);
-                    switch (action->get_order(action)) {
-                        case ACTION_CONNECT_ROBOT:
-                            rt_printf("tserver : Action connecter robot\n");
-                            rt_sem_v(&semConnecterRobot);
-                            break;
-                    }
-                    break;
-                case MESSAGE_TYPE_MOVEMENT:
-                    rt_printf("tserver : Le message reçu %d est un mouvement\n",
-                            num_msg);
-                    rt_mutex_acquire(&mutexMove, TM_INFINITE);
-                    move->from_message(move, msg);
-                    move->print(move);
-                    rt_mutex_release(&mutexMove);
-                    break;
+     while (1) {
+
+        rt_mutex_acquire(&mutexEtat, TM_INFINITE);
+        etatCommMoniteur = STATUS_OK;
+        rt_mutex_release(&mutexEtat);
+
+        while (receive_ok > 0) {
+            rt_printf("tserver : Attente d'un message\n");
+            receive_ok = serveur->receive(serveur, msg); //receive renvoie le nombre d'octets (0 ou inf si erreur)
+            num_msg++;
+            if(receive_ok >0) {
+                switch (msg->get_type(msg)) {
+                    case MESSAGE_TYPE_ACTION:
+                        rt_printf("tserver : Le message %d reçu est une action\n",
+                                num_msg);
+                        DAction *action = d_new_action();
+                        action->from_message(action, msg);
+                        switch (action->get_order(action)) {
+                            case ACTION_CONNECT_ROBOT:
+                                rt_printf("tserver : Action connecter robot\n");
+                                rt_sem_v(&semConnecterRobot);
+                                break;
+                        }
+                        break;
+                    case MESSAGE_TYPE_MOVEMENT:
+                        rt_printf("tserver : Le message reçu %d est un mouvement\n",
+                                num_msg);
+                        rt_mutex_acquire(&mutexMove, TM_INFINITE);
+                        move->from_message(move, msg);
+                        move->print(move);
+                        rt_mutex_release(&mutexMove);
+                        break;
+                }
             }
         }
     }
+    serveur->close(serveur) ;
 }
 
 void deplacer(void *arg) {
@@ -118,52 +129,56 @@ void deplacer(void *arg) {
         rt_task_wait_period(NULL);
         rt_printf("tmove : Activation périodique\n");
 
+/*
         rt_mutex_acquire(&mutexEtat, TM_INFINITE);
         status = etatCommRobot;
         rt_mutex_release(&mutexEtat);
+*/
+        rt_printf("tmove : Attente du sémaphore semDeplacer\n");
+        rt_sem_p(&semDeplacer, TM_INFINITE);
+        rt_printf("tmove : Sémaphore semDeplacer obtenu\n");
 
-        if (status == STATUS_OK) {
-            rt_mutex_acquire(&mutexMove, TM_INFINITE);
-            switch (move->get_direction(move)) {
-                case DIRECTION_FORWARD:
-                    gauche = MOTEUR_ARRIERE_LENT;
-                    droite = MOTEUR_ARRIERE_LENT;
-                    break;
-                case DIRECTION_LEFT:
-                    gauche = MOTEUR_ARRIERE_LENT;
-                    droite = MOTEUR_AVANT_LENT;
-                    break;
-                case DIRECTION_RIGHT:
-                    gauche = MOTEUR_AVANT_LENT;
-                    droite = MOTEUR_ARRIERE_LENT;
-                    break;
-                case DIRECTION_STOP:
-                    gauche = MOTEUR_STOP;
-                    droite = MOTEUR_STOP;
-                    break;
-                case DIRECTION_STRAIGHT:
-                    gauche = MOTEUR_AVANT_LENT;
-                    droite = MOTEUR_AVANT_LENT;
-                    break;
-            }
-            rt_mutex_release(&mutexMove);
+        rt_mutex_acquire(&mutexMove, TM_INFINITE);
 
-            status = robot->set_motors(robot, gauche, droite);
-
-            if (status != STATUS_OK) {
-                rt_mutex_acquire(&mutexEtat, TM_INFINITE);
-                etatCommRobot = status;
-                rt_mutex_release(&mutexEtat);
-
-                message = d_new_message();
-                message->put_state(message, status);
-
-                rt_printf("tmove : Envoi message\n");
-                if (write_in_queue(&queueMsgGUI, message, sizeof (DMessage)) < 0) {
-                    message->free(message);
-                }
-            }
+        switch (move->get_direction(move)) {
+            case DIRECTION_FORWARD:
+                gauche = MOTEUR_ARRIERE_LENT;
+                droite = MOTEUR_ARRIERE_LENT;
+                break;
+            case DIRECTION_LEFT:
+                gauche = MOTEUR_ARRIERE_LENT;
+                droite = MOTEUR_AVANT_LENT;
+                break;
+            case DIRECTION_RIGHT:
+                gauche = MOTEUR_AVANT_LENT;
+                droite = MOTEUR_ARRIERE_LENT;
+                break;
+            case DIRECTION_STOP:
+                gauche = MOTEUR_STOP;
+                droite = MOTEUR_STOP;
+                break;
+            case DIRECTION_STRAIGHT:
+                gauche = MOTEUR_AVANT_LENT;
+                droite = MOTEUR_AVANT_LENT;
+                break;
         }
+        rt_mutex_release(&mutexMove);
+
+        status = robot->set_motors(robot, gauche, droite);
+        gestionCompteur(status);
+
+        rt_mutex_acquire(&mutexEtat, TM_INFINITE);
+        etatCommRobot = status;
+        rt_mutex_release(&mutexEtat);
+
+        message = d_new_message();
+        message->put_state(message, status);
+
+        rt_printf("tmove : Envoi message\n");
+        if (write_in_queue(&queueMsgGUI, message, sizeof (DMessage)) < 0) {
+            message->free(message);
+        }
+        rt_sem_v(&semDeplacer);
     }
 }
 
@@ -177,7 +192,6 @@ void verifierbatterie(void *arg) {
     rt_printf("tbatterie : Debut de l'éxecution de periodique à 250ms\n");
     rt_task_set_periodic(NULL, TM_NOW, 250000000);
     
-    
     while(1){
         /* Attente de l'activation périodique */
         rt_task_wait_period(NULL);
@@ -186,10 +200,11 @@ void verifierbatterie(void *arg) {
         // attente semaphore
         rt_printf("tbatterie : Attente du sémarphore semVerifierBatterie\n");
         rt_sem_p(&semVerifierBatterie, TM_INFINITE);
-        rt_printf("tbatterie : Get semaphore batterie\n");
+        rt_printf("tbatterie : Semaphore batterie obtenu\n");
         
         status = robot->get_vbat(robot,&vbat);
-        
+        gestionCompteur(status);
+
         // status presque toujours 0, mais vbat risque -1
         if ((status == STATUS_OK)&&(vbat != BATTERY_LEVEL_UNKNOWN)) {
             batterie = d_new_battery();
@@ -208,6 +223,51 @@ void verifierbatterie(void *arg) {
         
         rt_sem_v(&semVerifierBatterie);
     }
+}
+
+void threadCompteur(void * arg){
+    DMessage *message;
+    int status = STATUS_ERR_TIMEOUT;
+
+    while(1){
+
+        rt_printf("tcompteur : Attente du sémaphore semCompteur\n");
+        rt_sem_p(&semCompteur, TM_INFINITE);
+        rt_printf("tcompteur : Sémaphore semCompteur obtenu\n");
+
+        message = d_new_message();
+        message->put_state(message, status);
+
+        rt_printf("tcompteur : Envoi message\n");
+        if (write_in_queue(&queueMsgGUI, message, sizeof (DMessage)) < 0) {
+            message->free(message);
+        }
+
+        rt_sem_p(&semVerifierBatterie, TM_INFINITE);
+        rt_printf("tcompteur : sémaphore semVerifierBatterie obtenu\n");
+        rt_sem_p(&semDeplacer, TM_INFINITE);
+        rt_printf("tcompteur : sémaphore semDeplacer obtenu, robot stoppé\n");
+        rt_sem_p(&semRechargerWD, TM_INFINITE);
+        rt_printf("tcompteur : sémaphore semRechargerWD obtenu\n");
+    }
+}
+
+void gestionCompteur(int status){
+    rt_mutex_acquire(&mutexCompteur, TM_INFINITE);
+    if(status == STATUS_OK){
+        compteur = 0;
+    }
+    else{
+        if(compteur < 7){
+            compteur ++;
+            rt_printf("gestionCompteur : compteur++, compteur = %d\n", compteur);
+        }
+        else{
+            rt_sem_v(&semCompteur);
+        }
+    }
+    rt_mutex_release(&mutexCompteur);
+    
 }
 
 // Recharger WD periode 1s+-100ms
