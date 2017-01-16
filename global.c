@@ -31,9 +31,6 @@ RT_SEM semRechargerWD;
 RT_SEM semTraiterImage;
 RT_SEM semArena;
 
-
-
-
 RT_QUEUE queueMsgGUI;
 
 int etatCommMoniteur = 1;
@@ -60,4 +57,3 @@ int PRIORITY_TMOVE              = 20;
 int PRIORITY_TTRAITERIMAGE      = 17;
 int PRIORITY_TARENA				= 15;
 int PRIORITY_TVERIFIERBATTERIE  = 12;
-

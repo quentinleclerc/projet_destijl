@@ -3,6 +3,7 @@
 int write_in_queue(RT_QUEUE *msgQueue, void * data, int size);
 void gestionCompteur(int status);
 
+
 void envoyer(void * arg) {
     DMessage *msg;
     int err;
@@ -20,6 +21,14 @@ void envoyer(void * arg) {
     }
 }
 
+
+/************************************************************ 
+ * CONNECTER                                                *
+ * Cette fonction s'occupe de la connexion au robot         *
+ * Quand la connexion est établie elle permet aux threads   *
+ * de commencer leur exécution.                             *
+ * Ce thread est normalement executé une seule fois.        *                        *
+ ************************************************************/
 void connecter(void * arg) {
     int status;
     DMessage *message;
@@ -41,9 +50,9 @@ void connecter(void * arg) {
                 rt_printf("tconnect : Robot démarré\n");
                 rt_printf("tconnect : Release sem verifier\n");
 
-                rt_sem_v(&semDeplacer);
-                rt_sem_v(&semVerifierBatterie);
                 rt_sem_v(&semRechargerWD);
+                rt_sem_v(&semDeplacer);
+                rt_sem_v(&semVerifierBatterie);  
             }
         }
 
@@ -59,6 +68,12 @@ void connecter(void * arg) {
     }
 }
 
+/************************************************************ 
+ * COMMUNIQUER                                              *
+ * Cette fonction gère la communication entre le moniteur   *
+ * et le superviseur.                                       *
+ * Execution aperiodique de ce thread.                      *
+ ************************************************************/
 void communiquer(void *arg) {
     DMessage *msg = d_new_message();
     int size = 1;
@@ -69,8 +84,6 @@ void communiquer(void *arg) {
     serveur->open(serveur, "8000");
     rt_printf("tserver : Connexion\n");
     rt_sem_v(&semTraiterImage);
-
-    //Intérieur du while ?????
 
     rt_mutex_acquire(&mutexEtat, TM_INFINITE);
     etatCommMoniteur = STATUS_OK;
@@ -141,13 +154,22 @@ void communiquer(void *arg) {
     serveur->close(serveur) ;
 } // _fin de boucle "COMMUNIQUER"
 
+
+
+
+/************************************************************* 
+ * DEPLACER                                                  *
+ * Cette fonction gère la communication entre le superviseur *
+ * et le robot. Elle répond aux ordres de déplacement.       *
+ * L'execution de ce thread est périodique 200ms.            *                    *
+ *************************************************************/
 void deplacer(void *arg) {
     int status = 1;
     int gauche;
     int droite;
 
     rt_printf("tmove : Debut de l'éxecution de periodique à 1s\n");
-    rt_task_set_periodic(NULL, TM_NOW, 1000000000);
+    rt_task_set_periodic(NULL, TM_NOW, 2000000000);
 
     while (1) {
         /* Attente de l'activation périodique */
@@ -191,7 +213,12 @@ void deplacer(void *arg) {
     }
 }
 
-// Batterie, periode 250ms, Low-priority
+/************************************************************* 
+ * VERIFIER BATTERIE                                         *
+ * Cette fonction indique l'état de batterie du robot au     *
+ * superviseur.                                              *
+ * L'execution de ce thread est périodique 250ms.            *                    *
+ *************************************************************/
 void verifierbatterie(void *arg) {
     int status = 0;
     int vbat;
@@ -234,6 +261,14 @@ void verifierbatterie(void *arg) {
     }
 }
 
+/************************************************************* 
+ * COMPTEUR                                                  *
+ * Cette fonction gère la deconnexion du robot, en empêchant *
+ * l'exécution des threads côté superviseur si elle est      *
+ * detectée perdue                                           *
+ * L'execution de ce thread est apériodique, elle est        *
+ * déclenchée par la fonction gestionCompteur(status)        *                    *
+ *************************************************************/
 void threadCompteur(void * arg){
     DMessage *message;
     int status = STATUS_ERR_TIMEOUT;
@@ -265,6 +300,13 @@ void threadCompteur(void * arg){
     }
 }
 
+
+
+/************************************************************* 
+ * GESTION COMPTEUR                                          *
+ * Fonction qui déclenche le thread compteur si la           *
+ * deconnexion a été repérée, après 7 messages non transmis  *
+ *************************************************************/
 void gestionCompteur(int status){
     rt_printf("tcompteur : appel, status = %d\n", status);
     rt_mutex_acquire(&mutexCompteur, TM_INFINITE);
@@ -285,7 +327,12 @@ void gestionCompteur(int status){
     
 }
 
-// Recharger WD periode 1s+-100ms
+/************************************************************* 
+ * RECHARGER WatchDog                                        *
+ * Fonction qui sert à recharger le watchdog du robot afin   *
+ * de détecter une éventuelle déconnexion                    *
+ * Exécution périodique du thread, toutes les 1s             *
+ *************************************************************/
 void rechargerwd(void *arg) {
 
     rt_printf("trechargerwd : Debut de l'éxecution de periodique à 1s\n");
@@ -307,8 +354,12 @@ void rechargerwd(void *arg) {
     }
 }
 
-// Traiter image, en fonction de etatPosition
-// 0 image sans position, ACTION_POSITION... image avec position
+/************************************************************* 
+ * Traiter Image                                             *
+ * Ce thread gère la récupération des images via la camera   *
+ * Elles sont ensuite envoyées au moniteur                   *
+ * L'exécution de ce thread est periodique 600 ms            *
+ *************************************************************/
 void traiterimage(void *arg) {
     int status = 0;
     DImage *image;
@@ -376,6 +427,16 @@ void traiterimage(void *arg) {
     }
 }
 
+
+/************************************************************* 
+ * Calibraion arène                                          *
+ * La calibration de l'arène detècte l'arène avec les images *
+ * en provenance de la caméra, et la trace sur l'écran du    *
+ * moniteur.                                                 *
+ * L'exécitop, de ce thread est apériodique, le semaphore    *
+ * est liberé par le thread communiquer si le bouton         *
+ * Chercher Arène est appuyé sur le moniteur                 *
+ *************************************************************/
 void calibrationArene(void *arg) {
     DImage *image;
     DMessage *message;
@@ -416,6 +477,12 @@ void calibrationArene(void *arg) {
     }
 }
 
+
+/************************************************************* 
+ * Write_in_queue                                            *
+ * Fonction qui envoie des messages au moniteur              *
+ * paramètres : queue de message, donnée, taille             *
+ *************************************************************/
 int write_in_queue(RT_QUEUE *msgQueue, void * data, int size) {
     void *msg;
     int err;
