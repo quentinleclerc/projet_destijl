@@ -17,7 +17,6 @@ RT_TASK trechargerwd;
 RT_TASK ttraiterimage;
 RT_TASK tcalibrationarena;
 
-RT_MUTEX mutexEtat;
 RT_MUTEX mutexMove;
 RT_MUTEX mutexCompteur;
 RT_MUTEX mutexImage;
@@ -33,8 +32,6 @@ RT_SEM semArena;
 
 RT_QUEUE queueMsgGUI;
 
-int etatCommMoniteur = 1;
-int etatCommRobot = 1;
 int compteur = 0;
 int etatImage = 0;
 

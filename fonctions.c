@@ -85,10 +85,6 @@ void communiquer(void *arg) {
     rt_printf("tserver : Connexion\n");
     rt_sem_v(&semTraiterImage);
 
-    rt_mutex_acquire(&mutexEtat, TM_INFINITE);
-    etatCommMoniteur = STATUS_OK;
-    rt_mutex_release(&mutexEtat);
-
     while (size > 0) {
         rt_printf("tserver : Attente d'un message\n");
         size = serveur->receive(serveur, msg); //receive renvoie le nombre d'octets (0 ou inf si erreur)

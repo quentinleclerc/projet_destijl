@@ -22,7 +22,6 @@ extern RT_TASK ttraiterimage;
 extern RT_TASK tcalibrationarena;
 
 /* @descripteurs des mutex */
-extern RT_MUTEX mutexEtat;
 extern RT_MUTEX mutexMove;
 extern RT_MUTEX mutexCompteur;
 extern RT_MUTEX mutexImage;
@@ -41,8 +40,6 @@ extern RT_SEM semArena;
 extern RT_QUEUE queueMsgGUI;
 
 /* @variables partagées */
-extern int etatCommMoniteur;
-extern int etatCommRobot;
 extern int compteur;
 extern int etatImage;
 

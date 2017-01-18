@@ -5,7 +5,7 @@
 /**
  * \fn void initStruct(void)
  * \brief Initialisation des structures de l'application (tâches, mutex, 
- * semaphore, etc.)
+ * semaphore, ec.)
  */
 void initStruct(void);
 
@@ -53,10 +53,6 @@ int main(int argc, char**argv) {
 void initStruct(void) {
     int err;
     /* Creation des mutex */
-    if (err = rt_mutex_create(&mutexEtat, NULL)) {
-        rt_printf("Error mutex create: %s\n", strerror(-err));
-        exit(EXIT_FAILURE);
-    }
     if (err = rt_mutex_create(&mutexMove, NULL)) {
         rt_printf("Error mutex create: %s\n", strerror(-err));
         exit(EXIT_FAILURE);
