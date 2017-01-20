@@ -20,7 +20,6 @@ RT_TASK tcalibrationarena;
 RT_MUTEX mutexMove;
 RT_MUTEX mutexCompteur;
 RT_MUTEX mutexImage;
-RT_MUTEX mutexArena;
 
 RT_SEM semConnecterRobot;
 RT_SEM semVerifierBatterie;
@@ -35,13 +34,10 @@ RT_QUEUE queueMsgGUI;
 int compteur = 0;
 int etatImage = 0;
 
-DArena *arena;
 DRobot *robot;
 DMovement *move;
 DServer *serveur;
 DCamera *camera;
-DArena *arena;
-DPosition *position;
 
 int MSG_QUEUE_SIZE = 10;
 

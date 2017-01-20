@@ -27,7 +27,7 @@ void envoyer(void * arg) {
  * Cette fonction s'occupe de la connexion au robot         *
  * Quand la connexion est établie elle permet aux threads   *
  * de commencer leur exécution.                             *
- * Ce thread est normalement executé une seule fois.        *                        *
+ * Ce thread est normalement executé une seule fois.        *                        
  ************************************************************/
 void connecter(void * arg) {
     int status;
@@ -92,8 +92,7 @@ void communiquer(void *arg) {
         if(size >0) {
             switch (msg->get_type(msg)) {
                 case MESSAGE_TYPE_ACTION:
-                    rt_printf("tserver : Le message %d reçu est une action\n",
-                            num_msg);
+                    rt_printf("tserver : Le message %d reçu est une action\n",num_msg);
                     DAction *action = d_new_action();
                     action->from_message(action, msg);
                     switch (action->get_order(action)) {
@@ -114,12 +113,10 @@ void communiquer(void *arg) {
 
                             rt_printf("tserver : semTraiterImage libéré \n");
                             rt_sem_v(&semTraiterImage);
-                            //Write Data sur la va glbale etat camera
                             break;
                         case ACTION_ARENA_IS_FOUND:
                             compteFindArena = 0;
                             rt_sem_v(&semTraiterImage);
-                            //Write Data sur la va glbale etat camera
                             break;
                         case ACTION_COMPUTE_CONTINUOUSLY_POSITION:
                             rt_mutex_acquire(&mutexImage, TM_INFINITE);
@@ -131,12 +128,10 @@ void communiquer(void *arg) {
                             rt_mutex_acquire(&mutexImage, TM_INFINITE);
                             etatImage = ACTION_STOP_COMPUTE_POSITION;
                             rt_mutex_release(&mutexImage);
-                            //Write Data sur la va glbale etatCalculPos
                             break;
                     } // _fin SWITCH Action
                 case MESSAGE_TYPE_MOVEMENT:
-                    rt_printf("tserver : Le message reçu %d est un mouvement\n",
-                            num_msg);
+                    rt_printf("tserver : Le message reçu %d est un mouvement\n",num_msg);
                     rt_mutex_acquire(&mutexMove, TM_INFINITE);
                     move->from_message(move, msg);
                     move->print(move);
@@ -157,7 +152,7 @@ void communiquer(void *arg) {
  * DEPLACER                                                  *
  * Cette fonction gère la communication entre le superviseur *
  * et le robot. Elle répond aux ordres de déplacement.       *
- * L'execution de ce thread est périodique 200ms.            *                    *
+ * L'execution de ce thread est périodique 200ms.            *                    
  *************************************************************/
 void deplacer(void *arg) {
     int status = 1;
@@ -213,7 +208,7 @@ void deplacer(void *arg) {
  * VERIFIER BATTERIE                                         *
  * Cette fonction indique l'état de batterie du robot au     *
  * superviseur.                                              *
- * L'execution de ce thread est périodique 250ms.            *                    *
+ * L'execution de ce thread est périodique 250ms.            *                    
  *************************************************************/
 void verifierbatterie(void *arg) {
     int status = 0;
@@ -263,7 +258,7 @@ void verifierbatterie(void *arg) {
  * l'exécution des threads côté superviseur si elle est      *
  * detectée perdue                                           *
  * L'execution de ce thread est apériodique, elle est        *
- * déclenchée par la fonction gestionCompteur(status)        *                    *
+ * déclenchée par la fonction gestionCompteur(status)        *                    
  *************************************************************/
 void threadCompteur(void * arg){
     DMessage *message;
@@ -310,7 +305,7 @@ void gestionCompteur(int status){
         compteur = 0;
     }
     else{
-        if(compteur < 7){
+        if(compteur < 6){
             compteur ++;
             rt_printf("gestionCompteur : compteur++, compteur = %d\n", compteur);
         }
@@ -361,6 +356,7 @@ void traiterimage(void *arg) {
     DImage *image;
     DJpegimage *jpegimage;
     DMessage *message;
+    DPosition *position;
     
     camera->open(camera);
 
@@ -389,11 +385,11 @@ void traiterimage(void *arg) {
         if (status == ACTION_COMPUTE_CONTINUOUSLY_POSITION){
        
             rt_printf("ttraiterimage : position\n");
-            
+
+            position = d_new_position();
             position = image->compute_robot_position(image,NULL);
             
             if (position != NULL){
-            // pas tester ici  !!!!!!!!
                 d_imageshop_draw_position(image,position);
                 
                 message = d_new_message();
@@ -403,8 +399,7 @@ void traiterimage(void *arg) {
                 if (write_in_queue(&queueMsgGUI, message, sizeof (DMessage)) < 0) {
                     message->free(message);
                 }
-            }
-            
+            }   
         }
         
         jpegimage->compress(jpegimage,image);
@@ -437,11 +432,9 @@ void calibrationArene(void *arg) {
     DImage *image;
     DMessage *message;
     DJpegimage *jpegim;
+    DArena *arena;
 
     while(1){
-        // Attente de l'activation périodique 
-        rt_task_wait_period(NULL);
-        rt_printf("tcalibrationarena : Activation apériodique\n");
 
         // attente semaphore
         rt_printf("tcalibrationarena : Attente du sémarphore semChercherArene\n");
@@ -453,14 +446,13 @@ void calibrationArene(void *arg) {
         jpegim = d_new_jpegimage();
         camera->get_frame(camera,image);
 
-        rt_mutex_acquire(&mutexArena, TM_INFINITE);
+        arena = d_new_arena();
         arena = image->compute_arena_position(image);
-        d_imageshop_draw_arena(image,arena);//imageshop
-        rt_mutex_release(&mutexArena);
+        d_imageshop_draw_arena(image,arena);
 
         jpegim->compress(jpegim,image);
 
-        image->free(image); //il en faut ou pas? diff entre free et release?
+        image->free(image);
 
         message = d_new_message();
         message->put_jpeg_image(message, jpegim);
@@ -469,7 +461,6 @@ void calibrationArene(void *arg) {
         if (write_in_queue(&queueMsgGUI, message, sizeof (DMessage)) < 0) {
             message->free(message);
         }
-
     }
 }
 
