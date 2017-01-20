@@ -305,7 +305,7 @@ void gestionCompteur(int status){
         compteur = 0;
     }
     else{
-        if(compteur < 6){
+        if(compteur < 7){
             compteur ++;
             rt_printf("gestionCompteur : compteur++, compteur = %d\n", compteur);
         }
