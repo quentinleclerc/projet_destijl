@@ -233,7 +233,7 @@ void verifierbatterie(void *arg) {
         gestionCompteur(status);
 
         // status presque toujours 0, mais vbat risque -1
-        if ((status == STATUS_OK)&&(vbat != BATTERY_LEVEL_UNKNOWN)) {
+        if ( (status == STATUS_OK) && (vbat != BATTERY_LEVEL_UNKNOWN) ) {
             batterie = d_new_battery();
             batterie->set_level(batterie,vbat);
             
@@ -325,6 +325,7 @@ void gestionCompteur(int status){
  * Exécution périodique du thread, toutes les 1s             *
  *************************************************************/
 void rechargerwd(void *arg) {
+    int status = 0;
 
     rt_printf("trechargerwd : Debut de l'éxecution de periodique à 1s\n");
     rt_task_set_periodic(NULL, TM_NOW, 1000000000);
@@ -339,7 +340,8 @@ void rechargerwd(void *arg) {
         rt_sem_p(&semRechargerWD, TM_INFINITE);
         rt_printf("trechargerwd : Get semaphore semRechargerWD\n");
 
-        robot->reload_wdt(robot);
+        status = robot->reload_wdt(robot);
+        gestionCompteur(status);
 
         rt_sem_v(&semRechargerWD);
     }
@@ -377,7 +379,7 @@ void traiterimage(void *arg) {
         
         camera->get_frame(camera,image);
            
-        /*pour savoir s'il s'agit du calcul position*/
+        /* pour savoir s'il s'agit du calcul position */
         rt_mutex_acquire(&mutexImage, TM_INFINITE);
         status = etatImage;
         rt_mutex_release(&mutexImage);
